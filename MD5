@@ -1,0 +1,12 @@
+77c0351cf909ecbb7507510ee70c0e9e *DESCRIPTION
+3cbe0e5b35f2459477820d339de5c095 *NAMESPACE
+24dc5fbe58455b71eba5743d0864a4a1 *R/Covest.R
+184571c956c013307ba3a484a93fc486 *R/data.R
+7c67358c6474c7c325741a3acac4efd8 *R/fingerprint.R
+20cc41843896e5a6463c3749d9d1d912 *R/fingerprintCEE.R
+9d0523c87bec9fc40b3f391aca464c33 *R/utils.R
+91bf2b68bd3fcbdde91eb25ff405da5c *data/simDat.rdata
+79376a7654e08e21bcaf22d8eec29c52 *man/Covest.Rd
+6224177bcf316d86ad13d8ebdb16fb33 *man/fingerprint.Rd
+f5463ce9ad106797197b491d4ba80538 *man/fingerprintCEE.Rd
+48da142136db8de7d097d2538b56c45e *man/simDat.Rd
