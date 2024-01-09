@@ -15,7 +15,8 @@
 ##' default same as ctlruns.1.
 ##' @param nS number of locations for the observed responses.
 ##' @param nT number of time steps for the observed responses.
-##' @param nB number of replicates in bootstrap.
+##' @param nB number of replicates in bootstrap for the bootstrapped variance and confidence 
+##' interval estimations.
 ##' @param conf.level confidence level for confidence interval estimation.
 ##' @param cal.a indicator for calculating the a value, otherwise use default value a = 1.
 ##' @param missing indicator for whether missing values present in Y.
@@ -25,8 +26,8 @@
 ##' variance, together with the residuals for model diagnostics.
 ##' @author Yan Li
 ##' @references \itemize{ 
-##' \item Sai etal, Optimal Fingerprinting with Estimating Equations, 2023, 
-##'       Journal of Climate.}
+##' \item Sai et al (2023), Optimal Fingerprinting with Estimating Equations,
+##'       \emph{Journal of Climate} 36(20), 7109–-7122.}
 ##' @examples
 ##' ## load the example dataset
 ##' data(simDat)
@@ -77,7 +78,7 @@ fingerprintCEE <- function(Xtilde, Y, mruns,
   if(missing) {
     ## if missing, do not calculate the a value
     output <- 
-      eefp_mis(Xt = Xtilde, Y = Y, m = mruns, 
+      eefp_mis(Xt = Xtilde, Y = Y, m = mruns,
                ctlruns1 = ctlruns.1, ctlruns2 = ctlruns.2,
                ni = nS, C = nT,
                ridge = ridge, nB = nB, conf.level = conf.level)
@@ -177,6 +178,8 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
       t(t(X[, seq(i, (p - 1)*C + i, C), drop = FALSE]) %*% 
           solve(Sig[((i - 1)*ni + 1):(i*ni), ((i - 1)*ni + 1):(i*ni)]) %*% 
           ep[((i - 1)*ni + 1):(i*ni)] + ni*mv%*%beta.hat) %>% as.matrix})
+    ## solve the one demensional problem
+    G <- matrix(G, nrow = p, ncol = C)
     return(G)
   }
   if(p > 1){
@@ -190,8 +193,8 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
     })
     Bsb <- c(1/a + mv * beta.hat^2) * var(Gsb)
   }
-  Bb <- Bsb
   ## bootstrap to calculate the Variance if nB > 0
+  Bb <- Bsb
   if(nB > 0) {
     l <- 2
     mblk <- sapply(1:nB,
@@ -206,19 +209,26 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
                    })
     Gb <- apply(mblk, 2,
                 function(x) {
-                  rowSums(G_fun(Y.o[x, ] - X.o[x, ] %*% beta.hat))
+                  rowSums(G_fun(Y.o[x,] - X.o[x, ] %*% beta.hat))
                 })
+    Gb <- matrix(Gb, nrow = p, ncol = nB)
     Bb <- cov(t(Gb))
   }
+  norm.crt <- qnorm(1 - (1 - conf.level)/2)  ## critical value for normal approximation
+  ## bootstrapped results
   Vsb <- A  %*% Bb %*% A
-  Vb <- A  %*% Bsb %*% A
-  sd_sb <- sqrt(diag(A  %*% Bb %*% A))
-  sd_b <- sqrt(diag(A  %*% Bsb %*% A))
-  norm.crt <- qnorm(1 - (1 - conf.level)/2)
+  sd_sb <- sqrt(diag(Vsb))
+  # sd_sb <- sqrt(diag(A  %*% Bb %*% A))
   ci_sb <- cbind(beta.hat - norm.crt * sd_sb,
-                 beta.hat + norm.crt * sd_sb)  
+                 beta.hat + norm.crt * sd_sb)
+  
+  ## approximated variance and confidence interval estimations
+  Vb <- A  %*% Bsb %*% A
+  sd_b <- sqrt(diag(Vb))
+  # sd_b <- sqrt(diag(A  %*% Bsb %*% A))
   ci_b <- cbind(beta.hat - norm.crt * sd_b,
                 beta.hat + norm.crt * sd_b)
+  
   ## calculate CI of a
   if(length(m) > 1){
     dotQ_t <- lapply(1:C, function(i){
@@ -267,8 +277,8 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
   Xlab <- paste0("X", 1:numbeta)
   if (nB > 0){
     result <- list(beta = as.vector(beta.hat),  ## point estimate
-                   var = Vsb, ci = ci_sb,  ## variance and CI
-                   var.boot = Vb, ci.boot = ci_b,  ## bootstrapped variance and CI
+                   var = Vb, ci = ci_b,  ## variance and CI
+                   var.boot = Vsb, ci.boot = ci_sb,  ## bootstrapped variance and CI
                    a = a, sd.a = sd_a, ci.a = ci_a,  ## p-value and ci for testing alpha = 1
                    p.value.a = p_test_a,
                    residuals = c(res), residuals.prewhit = res_pwh)  ## residuals and pre-whitened residuals
@@ -277,7 +287,7 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
     colnames(result$ci.boot) <- c("Lower bound", "Upper bound")
   } else {
     result <- list(beta = as.vector(beta.hat),
-                   var = Vsb, ci = ci_sb,
+                   var = Vb, ci = ci_b,  ## approximated var and CI
                    a = a, sd.a = sd_a, ci.a = ci_a,
                    p.value.a = p_test_a,
                    residuals = c(res), residuals.prewhit = res_pwh)
@@ -304,6 +314,8 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
 #### nB:         number of bootstrap replications.
 #### conf.level: confidence level.
 #### ridge:      coefficient for the shrinkage to handle missing value.
+
+## check the missing pattern
 eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C, 
                      ridge = 0, nB = 0, conf.level = 0.9) {
   ## check the missing value
@@ -356,12 +368,15 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
           solve(remove_empty(which = c("rows", "cols"), dat = Sig[((i - 1) * ni + 1):(i * ni), ((i - 1) * ni + 1):(i * ni), drop = FALSE])) %*% 
           remove_empty(which = c("rows", "cols"), dat = matrix(ep[((i - 1) * ni + 1):(i * ni)])) +
           ni * mv %*% beta.hat) %>% as.matrix})
+    ## solve the one demensional problem
+    G <- matrix(G, nrow = p, ncol = C)
     return(G)
   }
   Gsb <- sapply(1:l2, function(x){
     rowSums(G_fun(ctlruns2[x, ]))
   })
   Bsb <- c(1 + diag(mv) %*% beta.hat^2) * cov(t(Gsb))
+  ## bootstrap to calculate the Variance if nB > 0
   Bb <- Bsb
   if(nB > 0) {
     l <- 2
@@ -379,16 +394,22 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
                 function(x) {
                   rowSums(G_fun(Y.o[x, ] - X.o[x, ]%*%beta.hat))
                 })
+    ## fixed nB issue
+    Gb <- matrix(Gb, nrow = p, ncol = nB)
     Bb <- cov(t(Gb))
   }
-  ## calculate the variance and confidence interval
+  norm.crt <- qnorm(1 - (1 - conf.level)/2)  ## critical value for normal approximation
+  ## bootstrapped results
   Vsb <- A  %*% Bb %*% A
-  Vb <- A  %*% Bsb %*% A
-  sd_sb <- sqrt(diag(A  %*% Bb %*% A))
-  sd_b <- sqrt(diag(A  %*% Bsb %*% A))
-  norm.crt <- qnorm(1 - (1 - conf.level)/2)
+  sd_sb <- sqrt(diag(Vsb))
+  # sd_sb <- sqrt(diag(A  %*% Bb %*% A))
   ci_sb <- cbind(beta.hat - norm.crt * sd_sb,
-                 beta.hat + norm.crt * sd_sb)  
+                 beta.hat + norm.crt * sd_sb)
+  
+  ## approximated variance and confidence interval estimations
+  Vb <- A  %*% Bsb %*% A
+  sd_b <- sqrt(diag(Vb))
+  # sd_b <- sqrt(diag(A  %*% Bsb %*% A))
   ci_b <- cbind(beta.hat - norm.crt * sd_b,
                 beta.hat + norm.crt * sd_b)
   ## summarize the results as a list
@@ -396,14 +417,14 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
   Xlab <- paste0("X", 1:numbeta)
   if (nB > 0){
     result <- list(beta = as.vector(beta.hat),  ## point estimate
-                   var = Vsb, ci = ci_sb,  ## variance and CI
-                   var.boot = Vb, ci.boot = ci_b)  ## bootstrapped variance and CI
+                   var = Vb, ci = ci_b,  ## variance and CI
+                   var.boot = Vsb, ci.boot = ci_sb)  ## bootstrapped variance and CI
     rownames(result$var.boot) <- colnames(result$var.boot) <- Xlab
     rownames(result$ci.boot) <- Xlab
     colnames(result$ci.boot) <- c("Lower bound", "Upper bound")
   } else {
     result <- list(beta = as.vector(beta.hat),
-                   var = Vsb, ci = ci_sb)
+                   var = Vb, ci = ci_b)
   }
   ## rename the results
   names(result$beta) <- Xlab

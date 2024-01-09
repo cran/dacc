@@ -32,18 +32,20 @@ Cov.est <- Covest(Z, method = "l2")$output
 Cov.est <- Covest(Z, method = "mv", bandwidth = 0.35)$output
 }
 \references{
-\itemize{ \item  Olivier Ledoit and Michael Wolf,
+\itemize{ 
+\item  Olivier Ledoit and Michael Wolf (2004),
 A well-conditioned estimator for large-dimensional 
-covariance matrices, 2004, JMA. 
-\item Olivier Ledoit and Michael Wolf, 
+covariance matrices, \emph{Journal of multivariate analysis}, 88(2), 365--411.
+\item Olivier Ledoit and Michael Wolf (2017), 
 Direct nonlinear shrinkage estimation of 
-large-dimensional covariance matrices, Working Paper No. 264, UZH.
-\item Li et al,
+large-dimensional covariance matrices, \emph{Working Paper No. 264, UZH}.
+\item Li et al (2023),
 Regularized fingerprinting in detection and attribution of climate change 
 with weight matrix optimizing the efficiency in 
-scaling factor estimation, 2023, The Annals of Applied Statistics.}
+scaling factor estimation, \emph{Ann. Appl. Stat.} 17(1), 225--239.}
 }
 \author{
 Yan Li
 }
-\keyword{htest}
+\keyword{estimation}
+\keyword{variance}

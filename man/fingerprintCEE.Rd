@@ -39,7 +39,8 @@ default same as ctlruns.1.}
 
 \item{nT}{number of time steps for the observed responses.}
 
-\item{nB}{number of replicates in bootstrap.}
+\item{nB}{number of replicates in bootstrap for the bootstrapped variance and confidence 
+interval estimations.}
 
 \item{conf.level}{confidence level for confidence interval estimation.}
 
@@ -90,8 +91,8 @@ fingerprintCEE(Xtilde, Y, mruns,
 }
 \references{
 \itemize{ 
-\item Sai etal, Optimal Fingerprinting with Estimating Equations, 2023, 
-      Journal of Climate.}
+\item Sai et al (2023), Optimal Fingerprinting with Estimating Equations,
+      \emph{Journal of Climate} 36(20), 7109–-7122.}
 }
 \author{
 Yan Li
