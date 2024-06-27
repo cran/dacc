@@ -3,7 +3,7 @@
 \docType{data}
 \name{simDat}
 \alias{simDat}
-\title{Sample Data Used in Simulation Studies of 
+\title{Sample Dataset in Simulation Studies of 
 "Regularized Fingerprinting in Detection and Attribution of Climate Change 
 with Weight Matrix Optimizing the Efficiency in Scaling Factor Estimation".}
 \format{

@@ -5,72 +5,96 @@
 \title{Optimal Fingerprinting via total least square regression.}
 \usage{
 fingerprint(
-  X,
+  Xtilde,
   Y,
-  cov,
-  nruns.X,
-  ctlruns,
-  precision = FALSE,
-  conf.level = 0.9,
-  conf.method = c("none", "TSB", "PBC", "both"),
+  mruns,
+  ctlruns.sigma,
+  ctlruns.bhvar,
+  S,
+  T,
+  B,
+  method = c("EE", "PBC", "TS"),
   cov.method = c("l2", "mv"),
-  B = 1000
+  conf.level = 0.9,
+  missing = FALSE,
+  cal.a = TRUE,
+  ridge = 0
 )
 }
 \arguments{
-\item{X}{signal pattern to be detected.}
+\item{Xtilde}{\eqn{n \times p} matrix, signal pattern to be detected.}
 
-\item{Y}{observed data.}
+\item{Y}{\eqn{n \times 1} matrix, length \eqn{S \times T}, observed climate variable.}
 
-\item{cov}{Weight matrix used in prewhitening process, can be estimate of 
-covariance matrix or precision matrix.}
+\item{mruns}{number of ensembles to estimate the corresponding pattern. 
+It is used as the scale of the covariance matrix for \eqn{X_i}.}
 
-\item{nruns.X}{number of ensembles to estimate the corresponding pattern. 
-It is used as the scale of the covariance matrix for Xi.}
+\item{ctlruns.sigma}{\eqn{m \times n} matrix, a group of \eqn{m} independent control 
+runs for estimating covariance matrix, which is used in point estimation of 
+the signal factors.}
 
-\item{ctlruns}{a group of independent control runs for estimating 
-covariance matrix, which is used in two stage bootstrap and the parametric 
-bootstrap calibration.}
+\item{ctlruns.bhvar}{\eqn{m \times n} matrix, another group of \eqn{m} independent control 
+runs for estimating the corresponding confidence interval of the signal factors, 
+in EE or PBC approach should be same as ctlruns.sigma.}
 
-\item{precision}{indicator for precision matrix, if precision 
-matrix estimate is used, precision should be set to TRUE.}
+\item{S}{number of locations for the observed responses.}
+
+\item{T}{number of time steps for the observed responses.}
+
+\item{B}{number of replicates in bootstrap procedure.}
+
+\item{method}{for estimating the scaling factors and corresponding confidence interval}
+
+\item{cov.method}{method for estimation of covariance matrix in confidence 
+interval estimation of PBC method. (only for PBC method)}
 
 \item{conf.level}{confidence level for confidence interval estimation.}
 
-\item{conf.method}{method for calibrating the confidence intervals, including
-no calibration (none), two stage bootstrap (TSB), and parametric bootstrap calibration (PBC).}
+\item{missing}{indicator for whether missing values present in Y.}
 
-\item{cov.method}{method for estimation of covariance matrix in confidence 
-interval procedure. It should be consistent to the method to get cov. (only valid if TSB or PBC is considered.)}
+\item{cal.a}{indicator for calculating the a value, otherwise use default value a = 1. (only for EE method)}
 
-\item{B}{number of replicates in two stage bootstrap and/or parametric bootstrap calibration, 
-default value is 1000. (only valid if TSB or PBC is considered.)}
+\item{ridge}{shrinkage value for adjusting the method for missing observations if missing = TRUE. (only for EE method)}
 }
 \value{
 a list of the fitted model including point estimate and
-interval estimate of coefficients and corresponding estimate of 
-standard error.
+interval estimate of coefficients and corresponding estimate of standard error.
 }
 \description{
-This function detects the signal factors on the observed data via total 
-least square linear regression model.
+This function estimates the signal factors and corresponding confidence 
+interval via the estimating equation or total least squares.
 }
 \examples{
+## load the example dataset
 data(simDat)
-## set the true covariance matrix and expected pattern
 Cov <- simDat$Cov[[1]]
 ANT <- simDat$X[, 1]
 NAT <- simDat$X[, 2]
-## estimate the covariance matrix
-Z <- MASS::mvrnorm(100, mu = rep(0, nrow(Cov)), Sigma = Cov)
-## linear shrinkage estimator under l2 loss
-Cov.est <- Covest(Z, method = "l2")$output
-## generate regression observation and pattern
-nruns.X <- c(1, 1)
+
+## generate the simulated data set
+## generate regression observation
 Y <- MASS::mvrnorm(n = 1, mu = ANT + NAT, Sigma = Cov)
-X <- cbind(MASS::mvrnorm(n = 1, mu = ANT, Sigma = Cov),
-           MASS::mvrnorm(n = 1, mu = NAT, Sigma = Cov))
-fingerprint(X, Y, Cov.est, nruns.X, ctlruns = Z, conf.method = "TSB", B = 5)
+## generate the forcing responses
+mruns <- c(1, 1)
+Xtilde <- cbind(MASS::mvrnorm(n = 1, mu = ANT, Sigma = Cov / mruns[1]),
+               MASS::mvrnorm(n = 1, mu = NAT, Sigma = Cov / mruns[2]))
+## control runs
+ctlruns <- MASS::mvrnorm(100, mu = rep(0, nrow(Cov)), Sigma = Cov)
+## ctlruns.sigma for the point estimation and ctlruns.bhvar for the interval estimation
+ctlruns.sigma <- ctlruns.bhvar <- ctlruns
+## number of locations
+S <- 25
+## number of year steps
+T <- 10
+
+## call the function to estimate the signal factors via EE
+fingerprint(Xtilde, Y, mruns,
+          ctlruns.sigma, ctlruns.bhvar,
+          S, T, B = 10,
+          method = "EE",
+          conf.level = 0.9,
+          cal.a = TRUE,
+          missing = FALSE, ridge = 0)
 }
 \references{
 \itemize{ 
@@ -80,11 +104,19 @@ Regression Model: Large Sample Results, \emph{Ann. Stat.} 9(1) 24--44.
 \emph{SIAM J. Numer. Anal}. 17(6) 883--893.
 \item Pesta (2012), Total least squares and bootstrapping with 
 applications in calibration, \emph{Statistics} 47(5), 966--991.
-\item Li et al (2021), Uncertainty in Optimal Fingerprinting is Underestimated, \emph{Environ. Res. Lett.} 16(8) 084043.}
+\item Li et al (2021), Uncertainty in Optimal Fingerprinting is Underestimated, 
+      \emph{Environ. Res. Lett.} 16(8) 084043.
+\item Sai et al (2023), Optimal Fingerprinting with Estimating Equations,
+      \emph{Journal of Climate} 36(20), 7109–-7122.
+\item Li et al (2024), Detection and Attribution Analysis of Temperature Changes with Estimating Equations,
+      \emph{Submitted to Journal of Climate}.
+}
 }
 \author{
 Yan Li
 }
+\keyword{equation}
+\keyword{estimating}
 \keyword{fingerprinting}
 \keyword{regression}
 \keyword{tls}

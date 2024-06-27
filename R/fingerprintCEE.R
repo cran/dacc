@@ -6,7 +6,7 @@
 ##' @param Xtilde \eqn{n \times p} matrix, signal pattern to be detected.
 ##' @param Y \eqn{n \times 1} matrix, length \eqn{nS \times nT}, observed data.
 ##' @param mruns number of ensembles to estimate the corresponding pattern. 
-##' It is used as the scale of the covariance matrix for Xi.
+##' It is used as the scale of the covariance matrix for \eqn{X_i}.
 ##' @param ctlruns.1 \eqn{m \times n} matrix, a group of \eqn{m} independent control 
 ##' runs for estimating covariance matrix, which is used in point estimation of 
 ##' the signal factors.
@@ -28,50 +28,13 @@
 ##' @references \itemize{ 
 ##' \item Sai et al (2023), Optimal Fingerprinting with Estimating Equations,
 ##'       \emph{Journal of Climate} 36(20), 7109–-7122.}
-##' @examples
-##' ## load the example dataset
-##' data(simDat)
-##' Cov <- simDat$Cov[[1]]
-##' ANT <- simDat$X[, 1]
-##' NAT <- simDat$X[, 2]
-##' 
-##' ## generate the simulated data set
-##' ## generate regression observation
-##' Y <- MASS::mvrnorm(n = 1, mu = ANT + NAT, Sigma = Cov)
-##' ## generate the forcing responses
-##' mruns <- c(1, 1)
-##' Xtilde <- cbind(MASS::mvrnorm(n = 1, mu = ANT, Sigma = Cov / mruns[1]),
-##'                 MASS::mvrnorm(n = 1, mu = NAT, Sigma = Cov / mruns[2]))
-##' ## control runs
-##' ctlruns <- MASS::mvrnorm(100, mu = rep(0, nrow(Cov)), Sigma = Cov)
-##' ## ctlruns1 for the point estimation and ctlruns2 for the interval estimation
-##' ctlrun.1 <- ctlrun.2 <- ctlruns
-##' ## number of locations
-##' nS <- 25
-##' ## number of year steps
-##' nT <- 10
-##' ## call the function to estimate the signal factors via CEE
-##' fingerprintCEE(Xtilde, Y, mruns, 
-##'                ctlrun.1, ctlrun.2,
-##'                nS, nT, nB = 10,
-##'                conf.level = 0.9, 
-##'                cal.a = TRUE,
-##'                missing = FALSE, ridge = 0)
-##' @import magrittr
-##' @importFrom MASS mvrnorm
-##' @importFrom stats cov qnorm quantile sd var pnorm
-##' @importFrom utils tail
-##' @importFrom pracma ceil
-##' @importFrom janitor remove_empty
-##' @export fingerprintCEE
+##' @noRd
 
 fingerprintCEE <- function(Xtilde, Y, mruns,
                            ctlruns.1, ctlruns.2,
-                           nS, nT,
-                           nB = 0, 
+                           nS, nT, nB = 0,
                            conf.level = 0.9,
-                           cal.a = TRUE,
-                           missing = FALSE,
+                           cal.a = TRUE, missing = FALSE,
                            ridge = 0) {
   ## check whether there is missing value in the response
   output <- NULL
@@ -274,7 +237,11 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
                 a + norm.crt * sd_a)
   ## return the point estimate and confidence interval results as a list
   numbeta <- length(beta.hat)
-  Xlab <- paste0("X", 1:numbeta)
+  if(is.null(colnames(Xt))) {
+    Xlab <- paste0("forcings ", 1:numbeta)
+  } else {
+    Xlab <- colnames(Xt)
+  }
   if (nB > 0){
     result <- list(beta = as.vector(beta.hat),  ## point estimate
                    var = Vb, ci = ci_b,  ## variance and CI
@@ -314,6 +281,29 @@ eefp <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
 #### nB:         number of bootstrap replications.
 #### conf.level: confidence level.
 #### ridge:      coefficient for the shrinkage to handle missing value.
+
+# Xt <- Xtilde
+# Y <- Y
+# m <- nruns.X[c("ANT", "NAT")]
+# 
+# ctlruns1 <- ctlruns2 <- ctlruns
+# ni <- 54
+# C <- 13
+# 
+# ridge = 0; nB = 5; conf.level = 0.9
+# 
+# library(magrittr)
+# library(MASS)
+# library(stats)
+# library(utils)
+# library(pracma)
+# library(janitor)
+# 
+# eefp_mis(Xt, Y, m,
+#          ctlruns1, ctlruns2,
+#          ni, C,
+#          ridge, nB = 100, conf.level)
+
 
 ## check the missing pattern
 eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C, 
@@ -364,10 +354,11 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
   G_fun <- function(ep){
     ep[mis] <- NA
     G <- sapply(1:C, function(i){
-      t(t(remove_empty(which = c("rows", "cols"), dat = X[, seq(i, (p - 1) * C + i, C), drop = FALSE])) %*% 
-          solve(remove_empty(which = c("rows", "cols"), dat = Sig[((i - 1) * ni + 1):(i * ni), ((i - 1) * ni + 1):(i * ni), drop = FALSE])) %*% 
-          remove_empty(which = c("rows", "cols"), dat = matrix(ep[((i - 1) * ni + 1):(i * ni)])) +
-          ni * mv %*% beta.hat) %>% as.matrix})
+      t(t(remove_empty(which = c("rows", "cols"), dat = X[, seq(i, (p - 1) * C + i, C), drop = FALSE])) %*%
+            solve(remove_empty(which = c("rows", "cols"), dat = Sig[((i - 1) * ni + 1):(i * ni), ((i - 1) * ni + 1):(i * ni), drop = FALSE])) %*%
+            remove_empty(which = c("rows", "cols"), dat = matrix(ep[((i - 1) * ni + 1):(i * ni)])) +
+            ni * mv %*% beta.hat) %>% as.matrix
+      })
     ## solve the one demensional problem
     G <- matrix(G, nrow = p, ncol = C)
     return(G)
@@ -390,9 +381,31 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
                      idx3 <- -c(outer((ni - 1):0, idx2*ni, "-"))
                      return(idx3)
                    })
+    
+    G_fun_boot <- function(ep){
+      ep[mis] <- NA
+      G <- sapply(1:C, function(i){
+          tryCatch({
+            t(t(remove_empty(which = c("rows", "cols"), dat = X[, seq(i, (p - 1) * C + i, C), drop = FALSE])) %*%
+                solve(remove_empty(which = c("rows", "cols"), dat = Sig[((i - 1) * ni + 1):(i * ni), ((i - 1) * ni + 1):(i * ni), drop = FALSE])) %*%
+                remove_empty(which = c("rows", "cols"), dat = matrix(ep[((i - 1) * ni + 1):(i * ni)])) +
+                ni * mv %*% beta.hat) %>% as.matrix
+          }, error = function(e){
+            epmis <- which(is.na(ep[((i - 1) * ni + 1):(i * ni)]))
+            t(t(X[-epmis, seq(i, (p - 1) * C + i, C), drop = FALSE]) %*%
+                solve(Sig[((i - 1) * ni + 1):(i * ni), ((i - 1) * ni + 1):(i * ni), drop = FALSE][-epmis, -epmis, drop = FALSE]) %*%
+                matrix(ep[((i - 1) * ni + 1):(i * ni)][-epmis]) +
+                ni * mv %*% beta.hat) %>% as.matrix
+          })
+      })
+      ## solve the one demensional problem
+      G <- matrix(G, nrow = p, ncol = C)
+      return(G)
+    }
+    
     Gb <- apply(mblk, 2,
                 function(x) {
-                  rowSums(G_fun(Y.o[x, ] - X.o[x, ]%*%beta.hat))
+                    rowSums(G_fun_boot(Y.o[x, ] - X.o[x, ] %*% beta.hat), na.rm = TRUE)
                 })
     ## fixed nB issue
     Gb <- matrix(Gb, nrow = p, ncol = nB)
@@ -414,7 +427,11 @@ eefp_mis <- function(Xt, Y, m, ctlruns1, ctlruns2, ni, C,
                 beta.hat + norm.crt * sd_b)
   ## summarize the results as a list
   numbeta <- length(beta.hat)
-  Xlab <- paste0("X", 1:numbeta)
+  if(is.null(colnames(Xt))) {
+    Xlab <- paste0("forcings ", 1:numbeta)
+  } else {
+    Xlab <- colnames(Xt)
+  }
   if (nB > 0){
     result <- list(beta = as.vector(beta.hat),  ## point estimate
                    var = Vb, ci = ci_b,  ## variance and CI
